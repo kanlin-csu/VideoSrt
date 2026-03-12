@@ -1,0 +1,25 @@
+# Environments
+venv/
+.venv/
+env/
+.env/
+__pycache__/
+*.py[cod]
+
+# Videos
+*.mp4
+*.mkv
+*.mov
+*.avi
+*.webm
+*.m4v
+
+# Generated Subtitles
+*.srt
+*.vtt
+*.txt
+
+# IDEs
+.vscode/
+.idea/
+.DS_Store
