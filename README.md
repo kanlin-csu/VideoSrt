@@ -22,7 +22,12 @@
 2. **FFmpeg**：
    - 本程式需要調用系統底層的三方工具 FFmpeg 進行音訊提取。
    - **Windows 安裝方式**：可以從 [gyan.dev](https://www.gyan.dev/ffmpeg/builds/) 或 [BtbN](https://github.com/BtbN/FFmpeg-Builds/releases) 下載編譯好的執行檔，並將 `bin` 資料夾加入到系統的環境變數 `Path` 中。
-3. **NVIDIA GPU 驅動與 CUDA (選用但強烈建議)**：若要使用 GPU 加速，請確保電腦已安裝相對應的 NVIDIA 驅動程式與 CUDA Toolkit。
+   - **macOS (Mac) 安裝方式**：強烈建議使用 [Homebrew](https://brew.sh/) 進行安裝。在您的終端機中輸入以下指令：
+     ```bash
+     brew install ffmpeg
+     ```
+3. **NVIDIA GPU 驅動與 CUDA (選用，僅限 Windows / Linux)**：若要使用 GPU 加速，請確保電腦已安裝相對應的 NVIDIA 驅動程式與 CUDA Toolkit。
+   - **Mac 用戶注意**：Apple Silicon (M1/M2/M3 等) 及絕大多數 Mac 機型**不支援** CUDA。腳本在執行時會自動轉向 CPU 運算，`faster-whisper` 在 Mac 的 CPU 上也有相當出色的執行效率。
 
 ### 安裝 Python 套件
 
