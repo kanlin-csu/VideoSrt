@@ -37,10 +37,16 @@ def load_model(model_size: str = "medium", device: str = "auto", compute_type: s
 
     print(f"  載入模型: {model_size}  裝置: {device}  精度: {compute_type}")
 
+    # 指定下載路徑，避免 Mac/Linux 權限或找不到預設路徑的問題
+    import os
+    model_dir = os.path.join(os.path.dirname(os.path.dirname(__file__)), "models")
+    os.makedirs(model_dir, exist_ok=True)
+
     model = WhisperModel(
         model_size,
         device=device,
-        compute_type=compute_type
+        compute_type=compute_type,
+        download_root=model_dir
     )
     return model
 
