@@ -17,7 +17,6 @@ __pycache__/
 # Generated Subtitles
 *.srt
 *.vtt
-*.txt
 
 # IDEs
 .vscode/
