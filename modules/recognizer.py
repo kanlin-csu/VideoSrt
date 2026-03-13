@@ -4,6 +4,11 @@ recognizer.py - 語音識別模組
 """
 from faster_whisper import WhisperModel
 from modules.converter import to_traditional
+import sys
+import platform
+
+# 判斷是否為 Mac Apple Silicon (M1/M2/M3) 環境
+IS_MAC_ARM = sys.platform == "darwin" and platform.machine() == "arm64"
 
 
 # 支援的模型大小
@@ -37,6 +42,14 @@ def load_model(model_size: str = "medium", device: str = "auto", compute_type: s
 
     print(f"  載入模型: {model_size}  裝置: {device}  精度: {compute_type}")
 
+    if IS_MAC_ARM and device != "cpu":
+        # 在 Mac ARM 環境下，若使用者沒有強制指定 cpu，則改用 mlx-whisper
+        # MLX-Whisper 使用 Hugging Face 上的 MLX 社群模型路徑
+        mlx_model_name = f"mlx-community/whisper-{model_size}-mlx"
+        print(f"  [Mac 專屬] 啟動 MLX-Whisper 硬體加速引擎: {mlx_model_name}")
+        return mlx_model_name
+
+    # 原有 faster-whisper 載入邏輯 (Windows, Linux, 或 Mac 強制純 CPU 模式)
     # 指定下載路徑，避免 Mac/Linux 權限或找不到預設路徑的問題
     import os
     model_dir = os.path.join(os.path.dirname(os.path.dirname(__file__)), "models")
@@ -78,70 +91,105 @@ def transcribe(
     import time
     from tqdm import tqdm
 
-    segments_iter, info = model.transcribe(
-        audio_path,
-        language=language,
-        task=task,
-        beam_size=beam_size,
-        vad_filter=True,               # 過濾靜音片段
-        vad_parameters=dict(
-            min_silence_duration_ms=300
-        ),
-    )
-
-    detected_lang = info.language
-    lang_prob = info.language_probability
-    total_duration = info.duration  # 音訊總秒數
-
-    print(f"  偵測語言: {detected_lang} (信心度: {lang_prob:.1%})")
-    print(f"  影片長度: {_fmt_duration(total_duration)}")
-
     results = []
     t0 = time.time()
-
-    # 進度條：以音訊秒數為單位
-    with tqdm(
-        total=round(total_duration),
-        unit="秒",
-        desc="  轉錄進度",
-        bar_format="{desc}: {percentage:3.0f}%|{bar}| {n:.0f}/{total:.0f}秒 [{elapsed}<{remaining}, {rate_fmt}]",
-        dynamic_ncols=True,
-        colour="cyan",
-    ) as pbar:
-        last_pos = 0.0
-
-        for seg in segments_iter:
-            text = seg.text.strip()
-
-            # 更新進度條（推進到 segment 結束時間）
-            advance = max(0.0, seg.end - last_pos)
-            pbar.update(round(advance))
-            last_pos = seg.end
-
-            # 計算速度與剩餘時間
-            elapsed_real = time.time() - t0
-            speed_x = (last_pos / elapsed_real) if elapsed_real > 0 and last_pos > 0 else 0.0
-            remaining = ((total_duration - last_pos) / speed_x) if speed_x > 0 else 0.0
-            pct = min(last_pos / total_duration, 1.0) if total_duration > 0 else 0.0
-
-            pbar.set_postfix_str(f"{speed_x:.1f}x 速", refresh=False)
-
-            # 通知 GUI（若有提供 callback）
-            if progress_callback:
-                progress_callback(pct, speed_x, elapsed_real, remaining)
-
+    
+    # ── MLX-Whisper 處理邏輯 ──
+    if isinstance(model, str):
+        import mlx_whisper
+        print("  正在使用 MLX-Whisper 處理音訊中，請稍候...")
+        
+        # mlx_whisper 沒有 yield 機制，一次性回傳結果
+        mlx_result = mlx_whisper.transcribe(
+            audio_path,
+            path_or_hf_repo=model,
+            language=language,
+            task=task,
+            word_timestamps=False,
+            # 在 MLX 中沒有直接對應 beam_size，這裡依賴其內部預設
+        )
+        
+        detected_lang = mlx_result.get("language", language or "unknown")
+        print(f"  偵測語言: {detected_lang}")
+        
+        # 轉換 mlx_whisper 格式到系統所需格式
+        for seg in mlx_result.get("segments", []):
+            text = seg.get("text", "").strip()
             if not text:
                 continue
-
-            # 若識別語言是中文且要求繁體，進行轉換
+                
             if to_trad and task == "transcribe" and detected_lang in ("zh", "yue"):
                 text = to_traditional(text)
-
+                
             results.append({
-                "start": seg.start,
-                "end": seg.end,
+                "start": seg.get("start", 0.0),
+                "end": seg.get("end", 0.0),
                 "text": text,
             })
+            
+    # ── 原有 faster-whisper 處理邏輯 ──
+    else:
+        segments_iter, info = model.transcribe(
+            audio_path,
+            language=language,
+            task=task,
+            beam_size=beam_size,
+            vad_filter=True,               # 過濾靜音片段
+            vad_parameters=dict(
+                min_silence_duration_ms=300
+            ),
+        )
+
+        detected_lang = info.language
+        lang_prob = info.language_probability
+        total_duration = info.duration  # 音訊總秒數
+
+        print(f"  偵測語言: {detected_lang} (信心度: {lang_prob:.1%})")
+        print(f"  影片長度: {_fmt_duration(total_duration)}")
+
+        # 進度條：以音訊秒數為單位
+        with tqdm(
+            total=round(total_duration),
+            unit="秒",
+            desc="  轉錄進度",
+            bar_format="{desc}: {percentage:3.0f}%|{bar}| {n:.0f}/{total:.0f}秒 [{elapsed}<{remaining}, {rate_fmt}]",
+            dynamic_ncols=True,
+            colour="cyan",
+        ) as pbar:
+            last_pos = 0.0
+
+            for seg in segments_iter:
+                text = seg.text.strip()
+
+                # 更新進度條（推進到 segment 結束時間）
+                advance = max(0.0, seg.end - last_pos)
+                pbar.update(round(advance))
+                last_pos = seg.end
+
+                # 計算速度與剩餘時間
+                elapsed_real = time.time() - t0
+                speed_x = (last_pos / elapsed_real) if elapsed_real > 0 and last_pos > 0 else 0.0
+                remaining = ((total_duration - last_pos) / speed_x) if speed_x > 0 else 0.0
+                pct = min(last_pos / total_duration, 1.0) if total_duration > 0 else 0.0
+
+                pbar.set_postfix_str(f"{speed_x:.1f}x 速", refresh=False)
+
+                # 通知 GUI（若有提供 callback）
+                if progress_callback:
+                    progress_callback(pct, speed_x, elapsed_real, remaining)
+
+                if not text:
+                    continue
+
+                # 若識別語言是中文且要求繁體，進行轉換
+                if to_trad and task == "transcribe" and detected_lang in ("zh", "yue"):
+                    text = to_traditional(text)
+
+                results.append({
+                    "start": seg.start,
+                    "end": seg.end,
+                    "text": text,
+                })
 
     # 完成通知
     if progress_callback:

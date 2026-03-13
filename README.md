@@ -27,7 +27,7 @@
      brew install ffmpeg
      ```
 3. **NVIDIA GPU 驅動與 CUDA (選用，僅限 Windows / Linux)**：若要使用 GPU 加速，請確保電腦已安裝相對應的 NVIDIA 驅動程式與 CUDA Toolkit。
-   - **Mac 用戶注意**：Apple Silicon (M1/M2/M3 等) 及絕大多數 Mac 機型**不支援** CUDA。腳本在執行時會自動轉向 CPU 運算，`faster-whisper` 在 Mac 的 CPU 上也有相當出色的執行效率。
+   - **🧠 Mac Apple Silicon 專屬加速**：對於使用 M1/M2/M3 晶片的 Mac 用戶，**無需任何設定**，程式執行時會自動偵測並載入 Apple 官方的 `mlx-whisper` GPU 加速引擎，提供極致的轉錄速度。
 
 ### 安裝 Python 套件
 
