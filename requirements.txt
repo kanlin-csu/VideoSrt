@@ -3,4 +3,5 @@ ffmpeg-python
 opencc-python-reimplemented
 tqdm
 colorama
+tkinterdnd2
 mlx-whisper; sys_platform == 'darwin' and platform_machine == 'arm64'
