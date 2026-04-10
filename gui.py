@@ -260,7 +260,9 @@ class SubtitleGenApp:
                 pass
 
         old_stdout = sys.stdout
+        old_stderr = sys.stderr
         sys.stdout = _Redirect(self._log)
+        sys.stderr = _Redirect(self._log)
         tmp_wav_path = None
 
         try:
@@ -360,6 +362,7 @@ class SubtitleGenApp:
 
         finally:
             sys.stdout = old_stdout
+            sys.stderr = old_stderr
             if tmp_wav_path and os.path.exists(tmp_wav_path):
                 os.remove(tmp_wav_path)
             self._running = False
