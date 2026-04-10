@@ -1,98 +1,114 @@
-# Movie2Str (自動字幕生成工具)
+# VideoSrt — 自動字幕生成工具
 
-這是一個基於命令列 (CLI) 的自動字幕生成工具，使用 `faster-whisper` 進行高精準度且快速的語音識別。它可以從影片中提取音訊、自動生成字幕，並支援輸出繁體中文、英文，甚至是中英雙語字幕。
+從影片自動生成繁體中文 / 英文 / 雙語字幕，支援 **GUI 拖拉操作**與 **CLI 命令列**兩種使用方式。
+
+底層使用 [faster-whisper](https://github.com/SYSTRAN/faster-whisper) 進行語音識別，Mac Apple Silicon 另支援 [mlx-whisper](https://github.com/ml-explore/mlx-examples) 硬體加速。
+
+---
 
 ## ✨ 主要功能
 
-- 支援多種影片格式（MP4, MKV, MOV, AVI, WEBM, M4V 包含 H.264 / H.265 編碼）。
-- 自動將簡體中文轉換為**繁體中文**（使用 OpenCC）。
-- 支援翻譯功能，可將外語直接翻譯成英文。
-- 支援**中英雙語**字幕輸出。
-- 支援輸出 `.srt` 與 `.vtt` 兩種常見字幕格式。
-- 自動偵測 GPU (CUDA) 加速，若無 GPU 則會退回使用 CPU 進行運算。
-- 提供多種 Whisper 模型大小選擇 (tiny 到 large-v3)，可根據電腦硬體效能自由調整。
+- **GUI 介面**：拖拉影片即可開始，即時進度條顯示轉錄速度與剩餘時間
+- **CLI 介面**：腳本化、批次處理皆適用
+- 支援多種影片格式：MP4、MKV、MOV、AVI、WEBM、M4V（H.264 / H.265）
+- 輸出格式：`.srt`、`.vtt`，支援繁中、英文、雙語合併
+- 簡體中文自動轉繁體（OpenCC）
+- 自動偵測 CUDA GPU 加速；Mac M1/M2/M3 自動使用 MLX 加速
+- 六種模型大小可選（tiny → large-v3），彈性平衡速度與精準度
 
 ---
 
-## 🛠️ 安裝說明
+## 🛠️ 安裝
 
-### 系統必備條件
+### 系統需求
 
-1. **Python 3.8+** 或更新版本。
-2. **FFmpeg**：
-   - 本程式需要調用系統底層的三方工具 FFmpeg 進行音訊提取。
-   - **Windows 安裝方式**：可以從 [gyan.dev](https://www.gyan.dev/ffmpeg/builds/) 或 [BtbN](https://github.com/BtbN/FFmpeg-Builds/releases) 下載編譯好的執行檔，並將 `bin` 資料夾加入到系統的環境變數 `Path` 中。
-   - **macOS (Mac) 安裝方式**：強烈建議使用 [Homebrew](https://brew.sh/) 進行安裝。在您的終端機中輸入以下指令：
-     ```bash
-     brew install ffmpeg
-     ```
-3. **NVIDIA GPU 驅動與 CUDA (選用，僅限 Windows / Linux)**：若要使用 GPU 加速，請確保電腦已安裝相對應的 NVIDIA 驅動程式與 CUDA Toolkit。
-   - **🧠 Mac Apple Silicon 專屬加速**：對於使用 M1/M2/M3 晶片的 Mac 用戶，**無需任何設定**，程式執行時會自動偵測並載入 Apple 官方的 `mlx-whisper` GPU 加速引擎，提供極致的轉錄速度。
+- Python 3.8+
+- FFmpeg（需加入系統 PATH）
+  - Windows：至 [gyan.dev](https://www.gyan.dev/ffmpeg/builds/) 下載，解壓後將 `bin` 加入 PATH
+  - macOS：`brew install ffmpeg`
+- （選用）NVIDIA GPU + CUDA Toolkit → 啟用 GPU 加速
 
 ### 安裝 Python 套件
 
-建議使用虛擬環境 (如 `venv` 或 `conda`) 來避免套件衝突：
-
 ```bash
-# 建立並啟用虛擬環境 (選用)
+# 建立虛擬環境（建議）
 python -m venv venv
-venv\Scripts\activate
+venv\Scripts\activate      # Windows
+source venv/bin/activate   # macOS / Linux
 
-# 安裝依賴套件
+# 安裝套件
 pip install -r requirements.txt
 ```
 
-> **注意：** 若要啟動 GPU 運算，確保環境中的 PyTorch 支援 CUDA。可以參考 [PyTorch 官方網站](https://pytorch.org/get-started/locally/) 進行具體安裝（例如：`pip install torch torchvision torchaudio --index-url https://download.pytorch.org/whl/cu118` 或對應版本）。
+> GPU 加速需要支援 CUDA 的 PyTorch，請參考 [PyTorch 官網](https://pytorch.org/get-started/locally/) 安裝對應版本。
+> Mac Apple Silicon 使用者不需額外設定，程式會自動切換至 mlx-whisper。
 
 ---
 
-## 🚀 使用說明
+## 🖥️ GUI 使用方式（Windows）
 
-基本使用方式非常簡單，只需指定輸入影片檔案即可：
+雙擊 `launch_gui.bat` 啟動，不會出現黑色 console 視窗。
 
-### 1. 基本範例 (預設生成繁中字幕)
+```
+launch_gui.bat
+```
+
+或直接執行：
+
 ```bash
+python gui.py
+```
+
+**操作流程：**
+1. 將影片拖拉至視窗上方區域（需安裝 `tkinterdnd2`），或點擊選擇影片
+2. 確認輸出目錄（預設與影片同目錄）
+3. 選擇模型大小、語言、任務類型、輸出格式
+4. 按下「▶ 開始生成字幕」
+
+> 安裝 tkinterdnd2 以啟用拖拉功能：`pip install tkinterdnd2`
+
+---
+
+## ⌨️ CLI 使用方式
+
+```bash
+# 基本：生成繁中字幕
 python subtitle_gen.py --input video.mp4
-```
-這會在 `video.mp4` 所在的目錄下，產生 `video.zh.srt` 繁體中文字幕檔。
 
-### 2. 輸出中英雙語字幕
-```bash
+# 同時輸出繁中 + 英文雙語字幕
 python subtitle_gen.py --input video.mp4 --task both
-```
-這會同時辨識原始語言 (繁中) 與翻譯語言 (英文)，並匯出 `video.bilingual.srt` 雙語字幕，以及獨立的中文與英文字幕。
 
-### 3. 指定高精準度模型與輸出格式
-若您的顯示卡 VRAM 足夠且需要更高的辨識精準度，可以使用 `large-v2` 或 `large-v3` 模型，同時輸出 `srt` 與 `vtt` 格式：
-```bash
+# 指定高精準模型，同時輸出 SRT 與 VTT
 python subtitle_gen.py --input video.mp4 --model large-v2 --format srt vtt
-```
-*(注意：`large-v2` 模型約需 5.5GB 以上的 VRAM，`medium` 預設模型則約需 3GB。)*
 
-### 4. 強制使用 CPU 運算並指定語言
-```bash
+# 強制 CPU，指定語言為日文
 python subtitle_gen.py --input video.mp4 --device cpu --lang ja
 ```
 
 ---
 
-## ⚙️ 詳細參數清單
+## ⚙️ CLI 參數清單
 
 | 參數 | 縮寫 | 預設值 | 說明 |
-| --- | --- | --- | --- |
-| `--input` | `-i` | **(必填)** | 輸入影片路徑 (如：`.mp4`, `.mkv`) |
-| `--output` | `-o` | 影片同目錄 | 指定字幕的輸出目錄 |
-| `--model` | `-m` | `medium` | Whisper 模型大小 (`tiny`, `base`, `small`, `medium`, `large-v2`, `large-v3`) |
-| `--lang` | `-l` | (自動偵測) | 影片語言代碼 (如：`zh` 簡中/繁中, `en` 英文, `ja` 日文) |
-| `--task` | `-t` | `transcribe` | 任務類型：<br> `transcribe` (轉錄原本語言)<br> `translate` (翻譯為英文)<br> `both` (同時執行轉錄與翻譯) |
-| `--format` | `-f` | `srt` | 輸出字幕格式 (可複選 `srt`, `vtt`) |
-| `--device` | `-d` | `auto` | 運算裝置：`auto` (自動偵測CUDA), `cuda` (GPU), `cpu` |
-| `--beam-size` | | `5` | Beam search 的大小，數值越大越精準但較吃資源與時間 |
-| `--no-trad` | | `False` | 加上此參數時，**停止**自動將結果轉換為繁體中文 |
+|------|------|--------|------|
+| `--input` | `-i` | **(必填)** | 輸入影片路徑 |
+| `--output` | `-o` | 影片同目錄 | 字幕輸出目錄 |
+| `--model` | `-m` | `medium` | 模型大小：`tiny` / `base` / `small` / `medium` / `large-v2` / `large-v3` |
+| `--lang` | `-l` | 自動偵測 | 語言代碼：`zh`、`en`、`ja` … |
+| `--task` | `-t` | `transcribe` | `transcribe` 轉錄 / `translate` 翻譯成英文 / `both` 雙語 |
+| `--format` | `-f` | `srt` | 輸出格式（可複選）：`srt`、`vtt` |
+| `--device` | `-d` | `auto` | `auto` / `cuda` / `cpu` |
+| `--beam-size` | | `5` | Beam search 大小，越大越精準但越慢 |
+| `--no-trad` | | — | 停用簡轉繁，保留 Whisper 原始輸出 |
 
-## 📁 輸出檔案命名規則
+---
 
-程式將會根據你的選項輸出以下檔案格式（假設輸入檔案名為 `video.mp4`）：
-- `video.zh.srt` (中文版單語字幕)
-- `video.en.srt` (英文版單語字幕)
-- `video.bilingual.srt` (中英雙語字幕 - 當 `task` 為 `both` 時)
+## 📁 輸出檔案命名
+
+以輸入檔 `video.mp4` 為例：
+
+| 任務 | 輸出檔案 |
+|------|----------|
+| `transcribe` | `video.zh.srt` |
+| `translate` | `video.en.srt` |
+| `both` | `video.zh.srt`、`video.en.srt`、`video.bilingual.srt` |
