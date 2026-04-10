@@ -22,7 +22,7 @@
 
 ### 系統需求
 
-- Python 3.8+
+- Python 3.8 – 3.12（**請勿使用 3.13 以上**，部分依賴套件尚未支援）
 - FFmpeg（需加入系統 PATH）
   - Windows：至 [gyan.dev](https://www.gyan.dev/ffmpeg/builds/) 下載，解壓後將 `bin` 加入 PATH
   - macOS：`brew install ffmpeg`
