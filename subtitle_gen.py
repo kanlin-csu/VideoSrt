@@ -125,6 +125,12 @@ def parse_args():
         help="Beam search 大小 (預設: 5，越大越精準但越慢)",
     )
     parser.add_argument(
+        "--batch-size",
+        type=int,
+        default=8,
+        help="批次推論大小 (預設: 8，GPU 加速；設 1 關閉批次改逐段模式)",
+    )
+    parser.add_argument(
         "--no-trad",
         action="store_true",
         help="不轉換繁體中文 (保留 Whisper 原始輸出)",
@@ -211,6 +217,7 @@ def run():
                 task="transcribe",
                 to_trad=not args.no_trad,
                 beam_size=args.beam_size,
+                batch_size=args.batch_size,
             )
             outputs.append((segs_zh, "zh"))
 
@@ -223,6 +230,7 @@ def run():
                 task="translate",
                 to_trad=False,
                 beam_size=args.beam_size,
+                batch_size=args.batch_size,
             )
             outputs.append((segs_en, "en"))
 

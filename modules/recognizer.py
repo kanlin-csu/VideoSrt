@@ -110,6 +110,7 @@ def transcribe(
     task: str = "transcribe",
     to_trad: bool = True,
     beam_size: int = 5,
+    batch_size: int = 8,
     progress_callback=None,   # fn(pct:float, speed_x:float, elapsed:float, remaining:float)
 ) -> list:
     """
@@ -122,6 +123,9 @@ def transcribe(
         task: "transcribe"（保留原語言）或 "translate"（翻譯成英文）
         to_trad: 是否將簡體中文轉為繁體中文
         beam_size: beam search 大小（越大越精準但越慢）
+        batch_size: 批次推論大小。>1 時啟用 BatchedInferencePipeline，
+            以 VAD 切段後平行送入 GPU，速度通常快 2~4 倍、GPU 使用率更高。
+            設為 1（或 0）則走傳統逐段模式。8GB 顯存 + large-v3 建議 8。
         progress_callback: 選配，fn(pct, speed_x, elapsed_sec, remaining_sec)
 
     Returns:
@@ -168,16 +172,31 @@ def transcribe(
             
     # ── 原有 faster-whisper 處理邏輯 ──
     else:
-        segments_iter, info = model.transcribe(
-            audio_path,
-            language=language,
-            task=task,
-            beam_size=beam_size,
-            vad_filter=True,               # 過濾靜音片段
-            vad_parameters=dict(
-                min_silence_duration_ms=300
-            ),
-        )
+        vad_params = dict(min_silence_duration_ms=300)
+
+        if batch_size and batch_size > 1:
+            # 批次模式：以 VAD 切段後平行送入 GPU，速度更快、GPU 使用率更高
+            from faster_whisper import BatchedInferencePipeline
+            engine = BatchedInferencePipeline(model=model)
+            print(f"  批次模式啟用 (batch_size={batch_size})")
+            segments_iter, info = engine.transcribe(
+                audio_path,
+                language=language,
+                task=task,
+                beam_size=beam_size,
+                batch_size=batch_size,
+                vad_parameters=vad_params,
+            )
+        else:
+            # 逐段模式（傳統）
+            segments_iter, info = model.transcribe(
+                audio_path,
+                language=language,
+                task=task,
+                beam_size=beam_size,
+                vad_filter=True,               # 過濾靜音片段
+                vad_parameters=vad_params,
+            )
 
         detected_lang = info.language
         lang_prob = info.language_probability

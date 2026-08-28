@@ -34,6 +34,7 @@ class SubtitleGenApp:
         self.fmt_vtt      = tk.BooleanVar(value=False)
         self.device_var   = tk.StringVar(value="auto")
         self.beam_var     = tk.IntVar(value=5)
+        self.batch_var    = tk.IntVar(value=8)
         self.no_trad_var  = tk.BooleanVar(value=False)
         self.progress_var = tk.DoubleVar(value=0.0)
         self._running     = False
@@ -104,6 +105,12 @@ class SubtitleGenApp:
         ttk.Label(f1, text="Beam Size：").grid(row=2, column=0, sticky="w", pady=(4, 0))
         ttk.Spinbox(f1, from_=1, to=10, textvariable=self.beam_var, width=5).grid(
             row=2, column=1, sticky="w", padx=4, pady=(4, 0))
+
+        ttk.Label(f1, text="批次大小：").grid(row=3, column=0, sticky="w", pady=(4, 0))
+        ttk.Spinbox(f1, from_=1, to=32, textvariable=self.batch_var, width=5).grid(
+            row=3, column=1, sticky="w", padx=4, pady=(4, 0))
+        ttk.Label(f1, text="(GPU 加速，越大越快越吃顯存；1 = 關閉批次)").grid(
+            row=3, column=2, columnspan=2, sticky="w", pady=(4, 0))
 
         # 輸出設定
         f2 = ttk.LabelFrame(self.root, text=" 輸出設定 ", padding=8)
@@ -297,6 +304,7 @@ class SubtitleGenApp:
             task    = self.task_var.get()
             to_trad = not self.no_trad_var.get()
             beam    = self.beam_var.get()
+            batch   = self.batch_var.get()
 
             outputs = []
             if task in ("transcribe", "both"):
@@ -304,7 +312,8 @@ class SubtitleGenApp:
                 segs_zh, _ = transcribe(
                     model, tmp_wav_path, language=lang,
                     task="transcribe", to_trad=to_trad,
-                    beam_size=beam, progress_callback=self._on_progress,
+                    beam_size=beam, batch_size=batch,
+                    progress_callback=self._on_progress,
                 )
                 outputs.append((segs_zh, "zh"))
 
@@ -313,7 +322,8 @@ class SubtitleGenApp:
                 segs_en, _ = transcribe(
                     model, tmp_wav_path, language=lang,
                     task="translate", to_trad=False,
-                    beam_size=beam, progress_callback=self._on_progress,
+                    beam_size=beam, batch_size=batch,
+                    progress_callback=self._on_progress,
                 )
                 outputs.append((segs_en, "en"))
 
