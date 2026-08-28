@@ -2,13 +2,54 @@
 recognizer.py - 語音識別模組
 使用 faster-whisper，支援 CUDA (GTX 1660) 加速
 """
-from faster_whisper import WhisperModel
-from modules.converter import to_traditional
 import sys
 import platform
+import os
+
+
+def _load_cuda_dlls():
+    """
+    Windows 上，透過 pip 安裝的 nvidia-cublas-cu12 / nvidia-cudnn-cu12
+    會把 DLL 放在 site-packages/nvidia/*/bin，但該路徑預設不在 PATH 上，
+    導致 CTranslate2 找不到 cublas64_12.dll。此處手動掛載這些目錄。
+    在非 Windows 或未安裝這些套件時安靜略過。
+    """
+    if sys.platform != "win32":
+        return
+    try:
+        import nvidia
+    except ImportError:
+        return
+    base = list(nvidia.__path__)[0]
+    for sub in ("cublas", "cudnn", "cuda_nvrtc"):
+        d = os.path.join(base, sub, "bin")
+        if os.path.isdir(d):
+            try:
+                os.add_dll_directory(d)
+            except (OSError, AttributeError):
+                pass
+            os.environ["PATH"] = d + os.pathsep + os.environ.get("PATH", "")
+
+
+_load_cuda_dlls()
+
+from faster_whisper import WhisperModel
+from modules.converter import to_traditional
 
 # 判斷是否為 Mac Apple Silicon (M1/M2/M3) 環境
 IS_MAC_ARM = sys.platform == "darwin" and platform.machine() == "arm64"
+
+
+def _cuda_available() -> bool:
+    """
+    偵測是否有可用的 CUDA GPU，不依賴 torch（本專案未安裝 torch）。
+    直接問 CTranslate2 認得幾張 CUDA 裝置。
+    """
+    try:
+        from ctranslate2 import get_cuda_device_count
+        return get_cuda_device_count() > 0
+    except Exception:
+        return False
 
 
 # 支援的模型大小
@@ -31,10 +72,8 @@ def load_model(model_size: str = "medium", device: str = "auto", compute_type: s
     Returns:
         WhisperModel 實例
     """
-    import torch
-
     if device == "auto":
-        device = "cuda" if torch.cuda.is_available() else "cpu"
+        device = "cuda" if _cuda_available() else "cpu"
 
     if compute_type == "auto":
         # GTX 1660 支援 float16，CPU 建議用 int8 加速

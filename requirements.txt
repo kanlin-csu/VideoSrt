@@ -1,7 +1,18 @@
 faster-whisper
+# av 18.x 在 Windows 有 DLL 載入問題，鎖定已知可用的穩定版
+av==13.1.0
 ffmpeg-python
 opencc-python-reimplemented
 tqdm
 colorama
 tkinterdnd2
+
+# ── GPU (NVIDIA CUDA) 加速用 ──
+# CTranslate2 不自帶 CUDA 函式庫，需另外安裝 cuBLAS / cuDNN。
+# 僅在非 macOS 平台安裝（Mac ARM 走下方 mlx-whisper）。
+# 純 CPU 使用者可自行移除這兩行以節省約 1.3GB 下載。
+nvidia-cublas-cu12; sys_platform != 'darwin'
+nvidia-cudnn-cu12; sys_platform != 'darwin'
+
+# ── Mac Apple Silicon 專屬硬體加速 ──
 mlx-whisper; sys_platform == 'darwin' and platform_machine == 'arm64'
