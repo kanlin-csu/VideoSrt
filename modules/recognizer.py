@@ -110,7 +110,7 @@ def transcribe(
     task: str = "transcribe",
     to_trad: bool = True,
     beam_size: int = 5,
-    batch_size: int = 8,
+    batch_size: int = 1,
     progress_callback=None,   # fn(pct:float, speed_x:float, elapsed:float, remaining:float)
 ) -> list:
     """
@@ -123,9 +123,10 @@ def transcribe(
         task: "transcribe"（保留原語言）或 "translate"（翻譯成英文）
         to_trad: 是否將簡體中文轉為繁體中文
         beam_size: beam search 大小（越大越精準但越慢）
-        batch_size: 批次推論大小。>1 時啟用 BatchedInferencePipeline，
-            以 VAD 切段後平行送入 GPU，速度通常快 2~4 倍、GPU 使用率更高。
-            設為 1（或 0）則走傳統逐段模式。8GB 顯存 + large-v3 建議 8。
+        batch_size: 批次推論大小。預設 1 走逐段模式，使用模型原生斷句
+            （落在語氣停頓，最準）。設 >1 則啟用 BatchedInferencePipeline，
+            以 VAD 切段後平行送入 GPU，速度快 2~4 倍，但斷句改用標點近似、
+            準度略遜。想加速可設 8（8GB 顯存 + large-v3 適用）。
         progress_callback: 選配，fn(pct, speed_x, elapsed_sec, remaining_sec)
 
     Returns:

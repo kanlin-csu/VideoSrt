@@ -34,7 +34,7 @@ class SubtitleGenApp:
         self.fmt_vtt      = tk.BooleanVar(value=False)
         self.device_var   = tk.StringVar(value="auto")
         self.beam_var     = tk.IntVar(value=5)
-        self.batch_var    = tk.IntVar(value=8)
+        self.batch_var    = tk.IntVar(value=1)
         self.no_trad_var  = tk.BooleanVar(value=False)
         self.progress_var = tk.DoubleVar(value=0.0)
         self._running     = False
@@ -109,7 +109,7 @@ class SubtitleGenApp:
         ttk.Label(f1, text="批次大小：").grid(row=3, column=0, sticky="w", pady=(4, 0))
         ttk.Spinbox(f1, from_=1, to=32, textvariable=self.batch_var, width=5).grid(
             row=3, column=1, sticky="w", padx=4, pady=(4, 0))
-        ttk.Label(f1, text="(GPU 加速，越大越快越吃顯存；1 = 關閉批次)").grid(
+        ttk.Label(f1, text="(1 = 原生斷句最準；設 8 開 GPU 批次加速，斷句用近似)").grid(
             row=3, column=2, columnspan=2, sticky="w", pady=(4, 0))
 
         # 輸出設定

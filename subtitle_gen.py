@@ -127,8 +127,8 @@ def parse_args():
     parser.add_argument(
         "--batch-size",
         type=int,
-        default=8,
-        help="批次推論大小 (預設: 8，GPU 加速；設 1 關閉批次改逐段模式)",
+        default=1,
+        help="批次推論大小 (預設: 1，原生斷句最準；設 8 開啟 GPU 批次加速，斷句用近似)",
     )
     parser.add_argument(
         "--no-trad",
