@@ -25,3 +25,6 @@ __pycache__/
 
 # Downloaded Whisper models
 models/
+
+# Bundled ffmpeg binaries (downloaded separately, not tracked)
+ffmpeg/

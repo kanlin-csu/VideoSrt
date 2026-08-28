@@ -16,7 +16,7 @@ import ffmpeg
 def _find_ffmpeg() -> str | None:
     """
     找 ffmpeg 執行檔路徑。
-    優先用程式旁邊的 ffmpeg\ 資料夾（給打包版用）。
+    優先用程式旁邊的 ffmpeg/ 資料夾（給打包版用）。
     """
     # PyInstaller 打包後，執行檔所在目錄
     if getattr(sys, 'frozen', False):
