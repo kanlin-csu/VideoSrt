@@ -185,6 +185,7 @@ def transcribe(
                 task=task,
                 beam_size=beam_size,
                 batch_size=batch_size,
+                word_timestamps=True,          # 供後續拆成「一句一列」
                 vad_parameters=vad_params,
             )
         else:
@@ -239,15 +240,20 @@ def transcribe(
                 if not text:
                     continue
 
-                # 若識別語言是中文且要求繁體，進行轉換
-                if to_trad and task == "transcribe" and detected_lang in ("zh", "yue"):
-                    text = to_traditional(text)
-
-                results.append({
-                    "start": seg.start,
-                    "end": seg.end,
-                    "text": text,
-                })
+                # 將 segment 切成「一句一列」的字幕
+                # （批次模式的長段會在此依標點與長度拆短；逐段模式維持原樣）
+                for cs, ce, ctext in _seg_to_cues(seg):
+                    ctext = ctext.strip()
+                    if not ctext:
+                        continue
+                    # 若識別語言是中文且要求繁體，進行轉換
+                    if to_trad and task == "transcribe" and detected_lang in ("zh", "yue"):
+                        ctext = to_traditional(ctext)
+                    results.append({
+                        "start": cs,
+                        "end": ce,
+                        "text": ctext,
+                    })
 
     # 完成通知
     if progress_callback:
@@ -262,3 +268,64 @@ def _fmt_duration(seconds: float) -> str:
     h, rem = divmod(s, 3600)
     m, sec = divmod(rem, 60)
     return f"{h:02d}:{m:02d}:{sec:02d}" if h else f"{m:02d}:{sec:02d}"
+
+
+# ── 字幕斷句：把批次模式的長段拆成「一句一列」 ──
+_HARD_PUNCT = "。！？!?…"          # 句尾標點：硬斷句
+_SOFT_PUNCT = "，、,;；：:"          # 次級標點：過長時的軟斷點
+
+
+def _char_width(ch: str) -> int:
+    """全形/CJK 字元算 2，其餘算 1，用來估算字幕列的視覺寬度。"""
+    o = ord(ch)
+    if (0x4E00 <= o <= 0x9FFF or   # CJK 統一表意
+            0x3040 <= o <= 0x30FF or   # 日文假名
+            0xAC00 <= o <= 0xD7A3 or   # 韓文
+            0xFF00 <= o <= 0xFFEF or   # 全形符號
+            0x3000 <= o <= 0x303F):    # CJK 標點
+        return 2
+    return 1
+
+
+def _text_width(s: str) -> int:
+    return sum(_char_width(c) for c in s)
+
+
+def _split_words_to_cues(words, max_width: int = 40):
+    """
+    依標點與長度，把帶時間戳的字詞序列切成多列字幕（一句一列）。
+      - 遇句尾標點（。！？）即斷句
+      - 過長且遇次級標點（，、）也斷
+      - 真的太長（>1.4x）則強制斷，避免單列爆長
+    max_width 以視覺寬度計（CJK 算 2），40 約等於 20 個中文字。
+    每列時間 = 該列首字開始、末字結束。
+    """
+    cues = []
+    buf = []
+    for w in words:
+        buf.append(w)
+        text = "".join(x.word for x in buf).strip()
+        if not text:
+            buf = []
+            continue
+        width = _text_width(text)
+        last = text[-1]
+        if last in _HARD_PUNCT or \
+                (width >= max_width and last in _SOFT_PUNCT) or \
+                width >= max_width * 1.4:
+            cues.append((buf[0].start, buf[-1].end, text))
+            buf = []
+    if buf:
+        text = "".join(x.word for x in buf).strip()
+        if text:
+            cues.append((buf[0].start, buf[-1].end, text))
+    return cues
+
+
+def _seg_to_cues(seg):
+    """有字詞時間戳（批次模式）→ 拆成一句一列；否則整段一列（逐段模式行為不變）。"""
+    words = getattr(seg, "words", None)
+    if not words:
+        return [(seg.start, seg.end, seg.text)]
+    cues = _split_words_to_cues(words)
+    return cues if cues else [(seg.start, seg.end, seg.text)]
