@@ -103,6 +103,89 @@ python subtitle_gen.py --input video.mp4 --device cpu --lang ja
 
 ---
 
+## 🐳 Docker 容器執行（NVIDIA GPU）
+
+不想在主機上處理 CUDA / cuDNN 版本問題時，可以把語音識別放進容器跑。
+容器只跑 **CLI**（`subtitle_gen.py`）；GUI 仍在主機端執行。
+
+### 需求
+
+- NVIDIA GPU + 主機驅動（Windows 使用者裝 Windows 版驅動即可，**WSL 內不必另裝驅動**）
+- Docker Engine
+- [NVIDIA Container Toolkit](https://docs.nvidia.com/datacenter/cloud-native/container-toolkit/latest/install-guide.html)，並執行過
+  `sudo nvidia-ctk runtime configure --runtime=docker && sudo systemctl restart docker`
+
+驗證 GPU 有掛進容器：
+
+```bash
+docker run --rm --gpus all nvidia/cuda:12.8.0-base-ubuntu24.04 nvidia-smi
+```
+
+### 建置
+
+```bash
+docker build -t videosrt:gpu docker/
+```
+
+> build context 刻意指向 `docker/` 而非專案根目錄，避開 `venv/`、`models/`、
+> `VIDEO/` 等數 GB 的檔案。base image 為 `nvidia/cuda:12.8.0-cudnn-runtime`，
+> 已內含 CUDA 12.8 + cuDNN 9，正好對上 CTranslate2 4.8.x 的需求，
+> 因此容器內不必再從 PyPI 下載 `nvidia-cudnn-cu12`。
+
+### 執行
+
+專案目錄與 `models/` 是以 bind-mount 掛進容器的，因此**改 `modules/` 不必重新 build**，
+下載過的模型也直接沿用、不會重抓。
+
+```bash
+# WSL / Linux
+docker/vsrt.sh VIDEO/影片.mp4 --model large-v3
+docker/vsrt.sh --input VIDEO/影片.mp4 --task both --format srt vtt
+
+# Windows PowerShell（轉呼叫 WSL，Windows 路徑可直接傳）
+.\docker\vsrt.ps1 VIDEO\影片.mp4 --model large-v3
+.\docker\vsrt.ps1 --input D:\影片\上課.mp4 --output D:\輸出
+```
+
+CLI 參數與主機版完全相同，見上一節。
+
+不用包裝腳本、直接下 `docker run` 也可以：
+
+```bash
+docker run --rm -t --gpus all \
+    -v /path/to/VideoSrt:/app -w /app \
+    videosrt:gpu --input VIDEO/影片.mp4 --model large-v3
+```
+
+### 包裝腳本的環境變數
+
+| 變數 | 預設 | 說明 |
+|------|------|------|
+| `VSRT_IMAGE` | `videosrt:gpu` | 改用其他 image 標籤 |
+| `VSRT_GPU` | `1` | 設 `0` 停用 `--gpus all`，強制純 CPU |
+| `VSRT_DISTRO` | `kali-linux` | 僅 `vsrt.ps1`：指定 WSL 發行版 |
+
+### 路徑處理
+
+`vsrt.sh` 會自動轉換路徑，不必自己算容器內位置：
+
+- Windows 路徑（`D:\ai\...`）自動轉成 WSL 路徑
+- 專案目錄內的檔案 → `/app/...`
+- 專案目錄外的**輸入檔** → 其所在資料夾掛到 `/input`
+  （可寫，因為沒給 `--output` 時字幕預設就輸出到影片旁邊）
+- 專案目錄外的**輸出目錄** → 以可寫掛到 `/output`
+
+### 已知取捨
+
+- **每次執行都要重新載入模型**。large-v3 從 Windows 磁碟經 9p 讀進來約 14 秒，
+  另外 Blackwell（sm_120）首次推論有約 40 秒的 JIT 編譯。要批次處理多支影片時，
+  用一次 `docker run` 跑完會比每支各開一個容器划算。
+- 暫存 WAV 寫在容器內的 `/tmp`，不會落到掛載的磁碟上。
+- 容器以 root 執行。輸出寫到 Windows 磁碟（drvfs）沒有權限問題；
+  若把專案放在 WSL 原生檔案系統，產出的檔案會是 root 所有。
+
+---
+
 ## 📁 輸出檔案命名
 
 以輸入檔 `video.mp4` 為例：

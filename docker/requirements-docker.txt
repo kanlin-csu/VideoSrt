@@ -1,0 +1,11 @@
+# 容器版依賴（Linux/CUDA）。與根目錄 requirements.txt 的差異：
+#   - 不裝 nvidia-cublas-cu12 / nvidia-cudnn-cu12：base image 已內含，
+#     省下約 1.3GB 的 PyPI 下載（實測 PyPI 抓 cudnn 極慢）
+#   - 不裝 tkinterdnd2：GUI 留在 Windows 端，容器只跑 CLI
+#   - 不裝 mlx-whisper：Apple Silicon 專用
+faster-whisper==1.2.1
+av==13.1.0
+ffmpeg-python
+opencc-python-reimplemented
+tqdm
+colorama
